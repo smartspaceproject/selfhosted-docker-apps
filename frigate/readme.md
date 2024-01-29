@@ -41,9 +41,10 @@ Open source, written in Python and JavaScript.
 └── ~/
     └── docker/
         └── frigate/
+            ├── 🗁 frigate_config/
+            |    └── 🗋 config.yml
             ├── 🗁 frigate_storage/
             ├── 🗋 .env
-            ├── 🗋 config.yml
             └── 🗋 docker-compose.yml
 ```
 
@@ -52,8 +53,8 @@ Open source, written in Python and JavaScript.
 * `.env` - a file containing environment variables for docker compose
 * `docker-compose.yml` - a docker compose file, telling docker how to run the containers
 
-You only need to provide the three files.</br>
-The directory is created by docker compose on the first run.
+You need to create `frigate_config` directory and in it create `config.yml`.</br>
+Also you need to provide the compose file and the .env file.
 
 # docker-compose
 
@@ -66,12 +67,15 @@ commented out privileged mode, increased shm_size,...
 Of note is use of `tmpfs` for ram temp storage
 and [shm_size](https://docs.frigate.video/frigate/installation/#calculating-required-shm-size).
 
+In version 13, docker compose deployment is in the way that entire
+directory is mounted in, not just config file. Make not of it.
+
 `docker-compose.yml`
 ```yml
 services:
 
   frigate:
-    image: ghcr.io/blakeblackshear/frigate:stable
+    image: ghcr.io/blakeblackshear/frigate:0.13.0-beta7
     container_name: frigate
     hostname: frigate
     restart: unless-stopped
@@ -80,7 +84,7 @@ services:
     shm_size: "256mb"
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./config.yml:/config/config.yml
+      - ./frigate_config:/config
       - ./frigate_storage:/media/frigate
       - type: tmpfs # 1GB of memory
         target: /tmp/cache
@@ -125,8 +129,9 @@ cam.{$MY_DOMAIN} {
 }
 ```
 
-# Configuration - config.yml
+# Configuration - frigate_config/config.yml
 
+<details>
 <summary><h3>Terminology</h3></summary>
 
 * PoE - power over ethernet, camera is powered by the same cat cable that
@@ -136,6 +141,7 @@ cam.{$MY_DOMAIN} {
 * rtsp - a protocol for streams
 * ptz - Pan-Tilt-Zoom allows remote movement of a camera
 * mqtt - messaging protocol to communicate with home assistant
+</details>
 
 ### Preparation 
 
@@ -164,7 +170,7 @@ and then secondary one in much smaller resolution and fps for observing.
 Example bare config that should shows camera stream once frigate is running.<br>
 This one has credentails contained in the url - `rtsp://username:password@ip:port/url`
 
-
+`frigate_config/config.yml`
 ```yml
 mqtt:
   enabled: false
@@ -294,7 +300,64 @@ birdseye:
 # First run
 
 
+# Notifications
 
+Using ntfy, [gude here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/gotify-ntfy-signal).
+
+Following [this guide](https://beneaththeradar.blog/frigate-portainer-and-notifications-using-ntfy/)
+where emqx is setup as middle man.
+
+`docker-compose.yml`
+```yml
+services:
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:0.13.0-beta7
+    container_name: frigate
+    hostname: frigate
+    restart: unless-stopped
+    env_file: .env
+    privileged: true
+    user: root
+    shm_size: "256mb"
+    devices:
+      - /dev/dri/renderD128 # for intel hwaccel, needs to be updated for your hardware
+    cap_add:
+      - CAP_PERFMON
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./frigate_config:/config
+      - /mnt/data-1/frigate_storage:/media/frigate
+      - type: tmpfs # 1GB of memory
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    ports:
+      - "5000:5000" # Web GUI
+      - "8554:8554" # RTSP feeds
+      - "8555:8555/tcp" # WebRTC over tcp
+      - "8555:8555/udp" # WebRTC over udp
+
+  emqx:
+    image: emqx/emqx:5.3.2
+    container_name: emqx
+    hostname: frigate
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./emqx_data:/opt/emqx/data
+    ports:
+      - 1883:1883
+      - 8083:8083
+      - 8084:8084
+      - 8883:8883
+      - 18083:18083 # Web GUI
+
+networks:
+  default:
+    name: $DOCKER_MY_NETWORK
+    external: true
+```
 
 # Specifics of my setup
 
