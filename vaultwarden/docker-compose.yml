@@ -1,0 +1,40 @@
+services:
+
+  vaultwarden:
+    image: vaultwarden/server
+    container_name: vaultwarden
+    hostname: vaultwarden
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./vaultwarden_data/:/data/
+    ports:
+      - "3012:3012"
+    expose:
+      - "80"
+
+networks:
+  default:
+    name: $DOCKER_MY_NETWORK
+    external: true
+```
+
+`.env`
+```bash
+# GENERAL
+DOCKER_MY_NETWORK=caddy_net
+TZ=Europe/Bratislava
+
+# BITWARDEN
+ADMIN_TOKEN=zzYdLo1TM4MYzQ948oOVZ69IF4fABSrZMpk9
+SIGNUPS_ALLOWED=false
+WEBSOCKET_ENABLED=true
+
+# USING SENDINBLUE FOR SENDING EMAILS
+DOMAIN=https://vault.example.com
+SMTP_SECURITY=starttls
+SMTP_HOST=smtp-relay.sendinblue.com
+SMTP_PORT=587
+SMTP_FROM=admin@example.com
+SMTP_USERNAME=<registration-email@gmail.com>
+SMTP_PASSWORD=<sendinblue-smtp-key-goes-here>
